@@ -1,0 +1,208 @@
+function [N(t+1,:),S(t+1,:),...
+    V_1(t+1,:),V_1to2(t+1,:), V_2(t+1,:),I(t+1,:),inewt(t,:),Rnewt(t,:),Dnewt(t,:),Nnewt(t,:),I_Total(t+1,:),...
+    Totalinewt(t,:),R(t+1,:),D(t+1,:),Inventory(t+1,:),Administration_1(t:t+T_post-1,:),Administration_2(t,:),Allocation(t,:), Produce(t,:),A(t,:),B(t,:),C(t,:),Infected(t,:)]...
+    = fun_post_allocation_phase(N(Tp,:),S(Tp,:),...
+    V_1(Tp,:),V_1to2(Tp,:),V_2(Tp,:),I(Tp,:),inewt(Tp,:),Rnewt(Tp,:),Dnewt(Tp,:),Nnewt(Tp,:),I_Total(Tp,:),...
+    Totalinewt(Tp,:),R(Tp,:),D(Tp,:),Inventory(Tp,:),Administration_1(Tp,:),Administration_1,Administration_2(Tp,:),Allocation(Tp,:),Produce(Tp,:),A(Tp,:),B(Tp,:),C(Tp,:),Tp,T_post)
+%% Transmission process
+for t=1:T_post
+    for i=1:size(N,2)
+        for j=1:size(N,2)
+            for m=1:nos
+                if m==1
+                    A(t,i)= A(t,i) + (Travel(j,i)/N(t,j)*beta(i,m)*(1-miu(m))*I(t,j,m))/N(t,i);
+                    B(t,i)= B(t,i) + (Travel(j,i)/N(t,j)*beta(i,m)*(1-miu(m))*I(t,j,m))/N(t,i)*(1-Theta_1(m));
+                    C(t,i)= C(t,i) + (Travel(j,i)/N(t,j)*beta(i,m)*(1-miu(m))*I(t,j,m))/N(t,i)*(1-Theta_2(m));
+                elseif m==7
+                    A(t,i)= A(t,i) + (Travel(j,i)/N(t,j)*beta(i,m)*1*I(t,j,m)...
+                        + Travel(j,i)/N(t,j)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1))/N(t,i);
+                    B(t,i)= B(t,i) + ((1-Theta_1(m))*(Travel(j,i)/N(t,j)*beta(i,m)*1*I(t,j,m))...
+                        + (1-Theta_1(m-1))*(Travel(j,i)/N(t,j)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)))/N(t,i);
+                    C(t,i)= C(t,i) + ((1-Theta_2(m))*(Travel(j,i)/N(t,j)*beta(i,m)*1*I(t,j,m))...
+                        + (1-Theta_2(m-1))*(Travel(j,i)/N(t,j)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)))/N(t,i);
+                else
+                    A(t,i)= A(t,i) + (Travel(j,i)/N(t,j)*beta(i,m)*(1-miu(m))*I(t,j,m)...
+                        + Travel(j,i)/N(t,j)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1))/N(t,i);
+                    B(t,i)= B(t,i) + ((1-Theta_1(m))*(Travel(j,i)/N(t,j)*beta(i,m)*(1-miu(m))*I(t,j,m))...
+                        + (1-Theta_1(m-1))*(Travel(j,i)/N(t,j)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)))/N(t,i);
+                    C(t,i)= C(t,i) + ((1-Theta_2(m))*(Travel(j,i)/N(t,j)*beta(i,m)*(1-miu(m))*I(t,j,m))...
+                        + (1-Theta_2(m-1))*(Travel(j,i)/N(t,j)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)))/N(t,i);
+                end
+            end
+        end
+        
+        if t0<31
+            Administration_2(t,i)=0;
+            if Inventory(t,i)+Allocation(t,i)>=capacity(i)
+                Administration_1(t,i)=capacity(i);
+            else
+                Administration_1(t,i)=Inventory(t,i)+Allocation(t,i);
+            end
+            
+            S(t+1,i)=S(t,i)-(S(t,i)- Administration_1(t,i))* A(t,i)- Administration_1(t,i)+Epsilon*V_1(t,i)+Epsilon*V_2(t,i);
+            V_1(t+1,i)=V_1(t,i)-(V_1(t,i)+ Administration_1(t,i))* B(t,i)+ Administration_1(t,i)-Epsilon*V_1(t,i);
+            V_1to2(t+1,i)=0;
+            V_2(t+1,i)=V_2(t,i)-(V_2(t,i)+ Administration_2(t,i))* C(t,i)+ Administration_2(t,i)-Epsilon*V_2(t,i);
+            
+            for m=1:nos
+                for j=1:size(N,2)
+                    if m==1
+                        inewt(t,i,m)=inewt(t,i,m)+(S(t,i)- Administration_1(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)...
+                            +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_1(m))...
+                            +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_2(m));
+                    elseif m==7
+                        inewt(t,i,m)=inewt(t,i,m)+(S(t,i)- Administration_1(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j))/N(t,i)...
+                            +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                            +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                    else
+                        inewt(t,i,m)=inewt(t,i,m)+(S(t,i)- Administration_1(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j))/N(t,i)...
+                            +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                            +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                    end
+                end
+                I(t+1,i,m)=I(t,i,m)+inewt(t,i,m)-gamma*I(t,i,m)-d(i,m)*I(t,i,m);
+                I_Total(t+1,i)=I_Total(t+1,i)+I(t+1,i,m);
+                Rnewt(t,i)= Rnewt(t,i)+gamma*I(t,i,m);
+                Dnewt(t,i)= Dnewt(t,i)+d(i)*I(t,i,m);
+                Nnewt(t,i)= Nnewt(t,i)-d(i)*I(t,i,m);
+            end
+            R(t+1,i)= R(t,i)+Rnewt(t,i);
+            D(t+1,i)= D(t,i)+Dnewt(t,i);
+            N(t+1,i)= N(t,i)-Nnewt(t,i);
+            
+            if S(t+1,i)<0
+                S(t+1,i)=0+Epsilon*V_1(t,i)+Epsilon*V_2(t,i);
+                for m=1:nos
+                    for j=1:size(N,2)
+                        if m==1
+                            inewt(t,i,m)=inewt(t,i,m)...
+                                +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_1(m))...
+                                +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_2(m));
+                        elseif m==7
+                            inewt(t,i,m)=inewt(t,i,m)...
+                                +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                                +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                        else
+                            inewt(t,i,m)=inewt(t,i,m)+...
+                                +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                                +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                        end
+                    end
+                    I(t+1,i,m)=I(t,i,m)+inewt(t,i,m)+S(t,i)-gamma*I(t,i,m)-d(i,m)*I(t,i,m);
+                    I_Total(t+1,i)=I_Total(t+1,i)+I(t+1,i,m);
+                    Rnewt(t,i)= Rnewt(t,i)+gamma*I(t,i,m);
+                    Dnewt(t,i)= Dnewt(t,i)+d(i)*I(t,i,m);
+                    Nnewt(t,i)= Nnewt(t,i)-d(i)*I(t,i,m);
+                end
+                R(t+1,i)= R(t,i)+Rnewt(t,i);
+                D(t+1,i)= D(t,i)+Dnewt(t,i);
+                N(t+1,i)= N(t,i)-Nnewt(t,i);
+            end
+        end
+        
+        if t0>=31
+            if  Inventory(t,i)+Allocation(t,i)>=capacity(i)
+                if V_1to2(t,i)>=capacity(i)
+                    Administration_2(t,i)=capacity(i);
+                    Administration_1(t,i)=0;
+                else
+                    if capacity(i)-V_1to2(t,i)<=S(t,i)
+                        Administration_2(t,i)=V_1to2(t,i);
+                        Administration_1(t,i)=capacity(i)-Administration_2(t,i);
+                    else
+                        Administration_2(t,i)=V_1to2(t,i);
+                        Administration_1(t,i)=S(t,i);
+                    end
+                end
+            else
+                if V_1to2(t,i)>=Inventory(t,i)+Allocation(t,i)
+                    Administration_2(t,i)=Inventory(t,i)+Allocation(t,i);
+                    Administration_1(t,i)=0;
+                else
+                    if Inventory(t,i)+Allocation(t,i)-V_1to2(t,i)<=S(t,i)
+                        Administration_2(t,i)=V_1to2(t,i);
+                        Administration_1(t,i)=Inventory(t,i)+Allocation(t,i)-Administration_2(t,i);
+                    else
+                        Administration_2(t,i)=V_1to2(t,i);
+                        Administration_1(t,i)=S(t,i);
+                    end
+                end
+            end
+            
+            if t <= 30
+                S(t+1,i)=S(t,i)-(S(t,i)- Administration_1(t,i))* A(t,i)- Administration_1(t,i)+Epsilon*V_1(t,i)+Epsilon*V_2(t,i);
+                V_1(t+1,i)=V_1(t,i)-(V_1(t,i)+ Administration_1(t,i)-Administration_1all(t+t0-1-30,i)* (1-B(t,i))^30)* B(t,i)+ Administration_1(t,i)-Epsilon*V_1(t,i)-Administration_1all(t+t0-1-30,i)* (1-B(t,i))^30;
+                if V_1(t+1,i)<=0
+                    V_1(t+1,i)=0;
+                end
+                V_1to2(t+1,i)=V_1to2(t,i)-(V_1to2(t,i)+Administration_1all(t+t0-1-30,i)* (1-B(t,i))^30-Administration_2(t,i))* B(t,i)+Administration_1all(t+t0-1-30,i)* (1-B(t,i))^30-Administration_2(t,i)-Epsilon*V_1to2(t,i);
+                V_2(t+1,i)=V_2(t,i)-(V_2(t,i)+ Administration_2(t,i))* C(t,i)+ Administration_2(t,i)-Epsilon*V_2(t,i);
+            else
+                S(t+1,i)=S(t,i)-(S(t,i)- Administration_1(t,i))* A(t,i)- Administration_1(t,i)+Epsilon*V_1(t,i)+Epsilon*V_2(t,i);
+                V_1(t+1,i)=V_1(t,i)-(V_1(t,i)+ Administration_1(t,i)-Administration_1(t-30,i)* (1-B(t,i))^30)* B(t,i)+ Administration_1(t,i)-Epsilon*V_1(t,i)-Administration_1(t-30,i)* (1-B(t,i))^30;
+                if V_1(t+1,i)<=0
+                    V_1(t+1,i)=0;
+                end
+                V_1to2(t+1,i)=V_1to2(t,i)-(V_1to2(t,i)+Administration_1(t-30,i)* (1-B(t,i))^30-Administration_2(t,i))* B(t,i)+Administration_1(t-30,i)* (1-B(t,i))^30-Administration_2(t,i)-Epsilon*V_1to2(t,i);
+                V_2(t+1,i)=V_2(t,i)-(V_2(t,i)+ Administration_2(t,i))* C(t,i)+ Administration_2(t,i)-Epsilon*V_2(t,i);
+            end
+            
+            for m=1:nos
+                for j=1:size(N,2)
+                    if m==1
+                        inewt(t,i,m)=inewt(t,i,m)+(S(t,i)- Administration_1(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)...
+                            +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_1(m))...
+                            +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_2(m));
+                    elseif m==7
+                        inewt(t,i,m)=inewt(t,i,m)+(S(t,i)- Administration_1(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j))/N(t,i)...
+                            +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                            +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                    else
+                        inewt(t,i,m)=inewt(t,i,m)+(S(t,i)- Administration_1(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j))/N(t,i)...
+                            +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                            +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                    end
+                end
+                I(t+1,i,m)=I(t,i,m)+inewt(t,i,m)-gamma*I(t,i,m)-d(i,m)*I(t,i,m);
+                I_Total(t+1,i)=I_Total(t+1,i)+I(t+1,i,m);
+                Rnewt(t,i)= Rnewt(t,i)+gamma*I(t,i,m);
+                Dnewt(t,i)= Dnewt(t,i)+d(i)*I(t,i,m);
+                Nnewt(t,i)= Nnewt(t,i)-d(i)*I(t,i,m);
+            end
+            R(t+1,i)= R(t,i)+Rnewt(t,i);
+            D(t+1,i)= D(t,i)+Dnewt(t,i);
+            N(t+1,i)= N(t,i)-Nnewt(t,i);
+            
+            if S(t+1,i)<0
+                S(t+1,i)=0+Epsilon*V_1(t,i)+Epsilon*V_2(t,i);
+                for m=1:nos
+                    for j=1:size(N,2)
+                        if m==1
+                            inewt(t,i,m)=inewt(t,i,m)+...
+                                +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_1(m))...
+                                +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j))/N(t,i)*(1-Theta_2(m));
+                        elseif m==7
+                            inewt(t,i,m)=inewt(t,i,m)+...
+                                +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                                +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                        else
+                            inewt(t,i,m)=inewt(t,i,m)+...
+                                +(V_1(t,i)+ Administration_1(t,i)+V_1to2(t,i)-Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_1(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_1(m-1)))/N(t,i)...
+                                +(V_2(t,i)+ Administration_2(t,i))*(Travel(j,i)*beta(i,m)*(1-miu(m))*I(t,j,m)/N(t,j)*(1-Theta_2(m))+ Travel(j,i)*beta(i,m-1)*(miu(m-1))*I(t,j,m-1)/N(t,j)*(1-Theta_2(m-1)))/N(t,i);
+                        end
+                    end
+                    I(t+1,i,m)=I(t,i,m)+inewt(t,i,m)+S(t,i)-gamma*I(t,i,m)-d(i,m)*I(t,i,m);
+                    I_Total(t+1,i)=I_Total(t+1,i)+I(t+1,i,m);
+                    Rnewt(t,i)= Rnewt(t,i)+gamma*I(t,i,m);
+                    Dnewt(t,i)= Dnewt(t,i)+d(i)*I(t,i,m);
+                    Nnewt(t,i)= Nnewt(t,i)-d(i)*I(t,i,m);
+                end
+                R(t+1,i)= R(t,i)+Rnewt(t,i);
+                D(t+1,i)= D(t,i)+Dnewt(t,i);
+                N(t+1,i)= N(t,i)-Nnewt(t,i);
+            end
+        end
+        Inventory(t+1,i)=Inventory(t,i)+Allocation(t,i)-Administration_1(t,i)-Administration_2(t,i);%每日疫苗库存
+    end
+end
+end
